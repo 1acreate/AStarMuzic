@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Upload & Schedule Videos - AStar Muzic</title>
+  <style>
+    body { background: #222; color: #fff; font-family: sans-serif; padding: 20px; }
+    h1 { color: #f56; }
+    label, select, input, button { display: block; margin: 10px 0; width: 300px; max-width: 90%; padding: 8px; }
+    #scheduleList { margin-top: 20px; }
+    video { max-width: 320px; margin-top: 5px; border-radius: 6px; display: block; }
+    ul { list-style: none; padding-left: 0; }
+    li { margin-bottom: 15px; }
+  </style>
+</head>
+<body>
+  <h1>Upload & Schedule Videos - AStar Muzic</h1>
+
+  <form id="uploadForm">
+    <label>Video Type:</label>
+    <select id="videoType" required>
+      <option value="">Select Type</option>
+      <option value="youtube">YouTube</option>
+      <option value="cloudinary">Cloudinary</option>
+    </select>
+
+    <label>Video ID (for YouTube) OR Video URL (for Cloudinary):</label>
+    <input type="text" id="videoSource" placeholder="YouTube Video ID or Cloudinary Video URL" required />
+
+    <label>Video Title:</label>
+    <input type="text" id="videoTitle" placeholder="Enter video title" required />
+
+    <label>Start Time (24hr HH:MM):</label>
+    <input type="time" id="startTime" required />
+
+    <label>End Time (24hr HH:MM):</label>
+    <input type="time" id="endTime" required />
+
+    <button type="submit">Add to Schedule</button>
+  </form>
+
+  <div id="scheduleList">
+    <h2>Current Schedule</h2>
+    <ul id="scheduleItems">No videos scheduled yet.</ul>
+  </div>
+
+  <script>
+    const form = document.getElementById('uploadForm');
+    const scheduleList = document.getElementById('scheduleItems');
+    let schedule = JSON.parse(localStorage.getItem('astarmuzic_schedule')) || [];
+
+    function renderSchedule() {
+      if(schedule.length === 0){
+        scheduleList.innerHTML = '<li>No videos scheduled yet.</li>';
+        return;
+      }
+      scheduleList.innerHTML = '';
+      schedule.forEach((item, index) => {
+        let videoPreview = '';
+        if(item.type === 'youtube'){
+          videoPreview = `<iframe width="320" height="180" src="https://www.youtube.com/embed/${item.videoId}" frameborder="0" allowfullscreen></iframe>`;
+        } else if(item.type === 'cloudinary'){
+          videoPreview = `<video src="${item.file}" controls muted width="320"></video>`;
+        }
+        scheduleList.innerHTML += `
+          <li>
+            <strong>${item.title}</strong> (${item.type})<br/>
+            Time: ${item.start} - ${item.end}<br/>
+            ${videoPreview}<br/>
+            <button onclick="removeSchedule(${index})">Remove</button>
+          </li>
+        `;
+      });
+    }
+
+    function removeSchedule(index) {
+      schedule.splice(index, 1);
+      localStorage.setItem('astarmuzic_schedule', JSON.stringify(schedule));
+      renderSchedule();
+      alert('Schedule item removed. Refresh channel page if open.');
+    }
+
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const type = document.getElementById('videoType').value;
+      const source = document.getElementById('videoSource').value.trim();
+      const title = document.getElementById('videoTitle').value.trim();
+      const start = document.getElementById('startTime').value;
+      const end = document.getElementById('endTime').value;
+
+      if(!type || !source || !title || !start || !end){
+        alert('Please fill in all fields.');
+        return;
+      }
+
+      // Compose schedule item
+      const newItem = {
+        type,
+        title,
+        start,
+        end
+      };
+
+      if(type === 'youtube') {
+        newItem.videoId = source;  // YouTube video ID
+      } else if(type === 'cloudinary') {
+        newItem.file = source; // Cloudinary video URL
+      }
+
+      schedule.push(newItem);
+      localStorage.setItem('astarmuzic_schedule', JSON.stringify(schedule));
+      renderSchedule();
+      form.reset();
+      alert('Video added to schedule! Refresh channel page to see changes.');
+    });
+
+    window.removeSchedule = removeSchedule;
+    renderSchedule();
+  </script>
+</body>
+</html>

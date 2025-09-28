@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>AStar Muzic </title>
+<style>
+  body {
+    background: #000;
+    color: #fff;
+    font-family: Arial, sans-serif;
+    text-align: center;
+    padding: 20px;
+    margin: 0; 
+    overflow-x: hidden;
+  }
+  header {
+    font-size: 2rem;
+    margin-bottom: 20px;
+    color: #f56;
+  }
+  #youtubePlayer, #cloudinaryPlayer {
+    margin: auto;
+    width: 80%;
+    max-width: 900px;
+    height: 500px;
+    border: 3px solid #f56;
+    border-radius: 10px;
+    display: none;
+  }
+  #cloudinaryPlayer {
+    background: black;
+  }
+  #programTitle {
+    margin-top: 12px;
+    font-size: 1.3rem;
+    font-weight: bold;
+    color: #f56;
+  }
+  /* Logo container on top right */
+  #logoContainer {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 120px;
+    height: 120px;
+    z-index: 1000;
+    animation: floatLogo 4s ease-in-out infinite;
+  }
+  #logoContainer img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+  /* Subtle floating animation */
+  @keyframes floatLogo {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+</style>
+</head>
+<body>
+  <header>AStar Muzic</header>
+
+  <div id="logoContainer">
+    <img src="astar_muzic_logo.png" alt="AStar Muzic Logo" />
+  </div>
+
+  <!-- YouTube player container -->
+  <div id="youtubePlayer"></div>
+
+  <!-- Cloudinary video player -->
+  <video id="cloudinaryPlayer" controls muted></video>
+
+  <div id="programTitle">Loading program...</div>
+
+  <script>
+    // Load YouTube IFrame API
+    let tag = document.createElement('script');
+    tag.src = "https://www.youtube.com/iframe_api";
+    document.head.appendChild(tag);
+
+    // Load schedule from localStorage
+    const schedule = JSON.parse(localStorage.getItem('astarmuzic_schedule')) || [];
+
+    const youtubeContainer = document.getElementById('youtubePlayer');
+    const cloudinaryVideo = document.getElementById('cloudinaryPlayer');
+    const programTitle = document.getElementById('programTitle');
+
+    let player = null;
+    let currentProgram = null;
+
+    function timeToMinutes(t) {
+      const [h, m] = t.split(':').map(Number);
+      return h * 60 + m;
+    }
+    function getCurrentMinutes() {
+      const now = new Date();
+      return now.getHours() * 60 + now.getMinutes();
+    }
+    function isInTimeRange(current, start, end) {
+      if (end <= start) return current >= start || current < end;
+      return current >= start && current < end;
+    }
+
+    function createYouTubePlayer(videoId) {
+      if (player) {
+        player.destroy();
+        player = null;
+      }
+      youtubeContainer.style.display = 'block';
+      cloudinaryVideo.style.display = 'none';
+      player = new YT.Player('youtubePlayer', {
+        height: '500',
+        width: '900',
+        videoId: videoId,
+        playerVars: { autoplay: 1, controls: 1, mute: 1 },
+        events: {
+          onReady: (event) => event.target.playVideo(),
+          onError: () => programTitle.textContent = 'Error loading YouTube video.'
+        }
+      });
+    }
+
+    function showCloudinaryVideo(url) {
+      if (player) {
+        player.destroy();
+        player = null;
+      }
+      youtubeContainer.style.display = 'none';
+      cloudinaryVideo.src = url;
+      cloudinaryVideo.style.display = 'block';
+      cloudinaryVideo.currentTime = 0;
+      cloudinaryVideo.play().catch(() => {
+        console.warn('Cloudinary autoplay blocked, user interaction needed.');
+      });
+    }
+
+    function updateSchedule() {
+      const now = getCurrentMinutes();
+      let prog = schedule.find(p => isInTimeRange(now, timeToMinutes(p.start), timeToMinutes(p.end)));
+
+      if (!prog) {
+        currentProgram = null;
+        programTitle.textContent = 'No program airing right now.';
+        youtubeContainer.style.display = 'none';
+        cloudinaryVideo.style.display = 'none';
+        if (player) {
+          player.destroy();
+          player = null;
+        }
+        cloudinaryVideo.pause();
+        cloudinaryVideo.removeAttribute('src');
+        return;
+      }
+
+      if (!currentProgram || currentProgram.videoId !== prog.videoId || currentProgram.file !== prog.file || currentProgram.type !== prog.type) {
+        currentProgram = prog;
+        programTitle.textContent = prog.title;
+
+        if (prog.type === "youtube") {
+          createYouTubePlayer(prog.videoId);
+        }
+        else if (prog.type === "cloudinary") {
+          showCloudinaryVideo(prog.file);
+        } else {
+          programTitle.textContent = "Unknown program type.";
+        }
+      }
+    }
+
+    function onYouTubeIframeAPIReady() {
+      updateSchedule();
+      setInterval(updateSchedule, 30000);
+    }
+    window.onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
+  </script>
+</body>
+</html>
